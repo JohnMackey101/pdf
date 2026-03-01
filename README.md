@@ -9,7 +9,7 @@ This is an interactive command-line tool that does the following things:
 
 ## Requirements
 
-- Python **3.12** (3.14 is not supported — spacy incompatibility)
+- Python **3.12** (3.14 is not supported - spacy is incompatible..)
 - Make sure you get these packages:
 
 ```
