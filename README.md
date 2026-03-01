@@ -9,14 +9,25 @@ This is an interactive command-line tool that does the following things:
 
 ## Requirements
 
-- Python **3.12** (3.14 is not supported - spacy is incompatible..)
+- Python **3.12.12** (3.14 is not supported - spacy is incompatible..)
 - Make sure you get these packages:
 
 ```
+py -3.12 -m venv venv 
+venv\Scripts\activate
 pip install pymupdf pymupdf4llm spacy
 python -m spacy download en_core_web_sm
 ```
+- Skip the first 2 lines if you don't care about initializing a local env (recommended).
+- Also make sure to cd to your folder directory before you run all this..
 
+- IF you have Anaconda run these commands in your anaconda terminal
+```
+conda create -n pdfanon python=3.12
+conda activate pdfanon
+pip install pymupdf pymupdf4llm spacy
+python -m spacy download en_core_web_sm
+```
 ---
 
 ## Usage
