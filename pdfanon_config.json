@@ -1,0 +1,51 @@
+{
+  "output_suffix": "_anonymized",
+  "spacy_model": "en_core_web_sm",
+  "spacy_entities": [
+    "PERSON",
+    "GPE",
+    "ORG"
+  ],
+  "mask_style": {
+    "__comment__": "Set any category to a fixed label like '[NAME]' or '[REDACTED]'. Leave out to use the default star masking.",
+    "PERSON": "",
+    "EMAIL": "[EMAIL]",
+    "PHONE": "",
+    "INTL_PHONE": "",
+    "SSN": "",
+    "CREDIT_CARD": "",
+    "ACCT_NUMBER": "",
+    "ADDRESS": "",
+    "GPE": "",
+    "ORG": ""
+  },
+  "spacy_blocklist": [
+    "mm",
+    "dd",
+    "yyyy",
+    "Page",
+    "Statement Date",
+    "Period Covered",
+    "Opening Balance",
+    "Closing Balance",
+    "Account Type",
+    "Branch Name",
+    "Current Account",
+    "Statement",
+    "Date",
+    "Balance",
+    "Debit",
+    "Credit",
+    "Page of",
+    "Page    of"
+  ],
+  "patterns": {
+    "EMAIL": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b",
+    "PHONE": "(?:(?:\\+44|0)[\\s-]?(?:\\d[\\s-]?){9,10})\\b",
+    "INTL_PHONE": "\\+\\d{1,3}[\\s-]?(?:\\d[\\s-]?){6,14}\\b",
+    "SSN": "\\b\\d{3}[-]?\\d{2}[-]?\\d{4}\\b",
+    "CREDIT_CARD": "\\b(?:\\d{4}[-\\s]?){3}\\d{4}\\b",
+    "ACCT_NUMBER": "Account Number:\\s*([\\d\\-]+)",
+    "ADDRESS": "\\d{2,5}\\s[A-Z][a-zA-Z\\s,]+(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Ct|Court|STE|Suite|Hwy|Pkwy)[^\\n]*?\\d{5}"
+  }
+}
