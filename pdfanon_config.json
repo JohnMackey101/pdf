@@ -4,7 +4,8 @@
   "spacy_entities": [
     "PERSON",
     "GPE",
-    "ORG"
+    "ORG",
+    "LAW"
   ],
   "mask_style": {
     "__comment__": "Set any category to a fixed label like '[NAME]' or '[REDACTED]'. Leave out to use the default star masking.",
@@ -17,7 +18,9 @@
     "ACCT_NUMBER": "",
     "ADDRESS": "",
     "GPE": "",
-    "ORG": "COMPANY XYZ"
+    "ORG": "COMPANY X",
+    "LAW": "COMPANY X",
+    "COMPANY_NAMES": "COMPANY X" 
   },
   "spacy_blocklist": [
     "mm",
@@ -51,7 +54,8 @@
     "IBAN": "(?i)IBAN(?:\\s*(?:No\\.?|Number))?\\s*:?\\s*([A-Z]{2}\\d{2}(?:\\s?[A-Z0-9]){11,30})\\b",
     "FAX_NUMBER_HASH": "Fax Number\\s*#\\s*([\\+\\d\\(\\)\\s\\-]{6,})",
     "FAX_NUMBER_COLON": "Fax Number:\\s*([\\+\\d\\(\\)\\s\\-]{6,})",
-    "FAX_COLON": "Fax:\\s*([\\+\\d\\(\\)\\s\\-]{6,}",
-    "ADDRESS": "\\d{2,5}\\s[A-Z][a-zA-Z\\s,]+(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Ct|Court|STE|Suite|Hwy|Pkwy)[^\\n]*?\\d{5}"
+    "FAX_COLON": "Fax:\\s*([\\+\\d\\(\\)\\s\\-]{6,})",
+    "ADDRESS": "\\d{2,5}\\s[A-Z][a-zA-Z\\s,]+(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Ct|Court|STE|Suite|Hwy|Pkwy)[^\\n]*?\\d{5}",
+    "COMPANY_NAMES": "(?i)\\b(Affinity\\s+Water)\\b"
   }
 }

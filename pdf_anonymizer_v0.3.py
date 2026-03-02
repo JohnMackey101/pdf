@@ -278,6 +278,20 @@ def process_doc(path: str, nlp) -> list:
 
     # remove any weird asterick formatting
     lines = [re.sub(r'\*+', '', line).strip() for line in lines]
+
+    # Flatten markdown table rows for cases like |SWIFT:|BARCGB22| -> SWIFT: BARCGB22
+    # Strip leading/trailing | and replace them with a space
+    cleaned = []
+    for line in lines:
+        if line.startswith("|") and line.endswith("|"):
+            # skip the markdown table separator rows like |---|---|
+            if re.match(r'^\|[-| :]+\|$', line):
+                continue
+            line = line.strip("|")
+            line = re.sub(r'\|', ' ', line).strip()
+        cleaned.append(line)
+    lines = cleaned
+
     return merge_lines(lines, nlp) # merge lines once we're donezo
 
 def detect_pii(text_arr: list, cfg: dict, nlp) -> tuple[dict, dict]:
