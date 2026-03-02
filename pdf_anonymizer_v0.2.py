@@ -31,16 +31,16 @@ DEFAULT_CONFIG = {
     "spacy_model": "en_core_web_sm",
     "spacy_entities": ["PERSON", "GPE", "ORG"],
     "mask_style": {
-        "PERSON":      "",
-        "EMAIL":       "",
-        "PHONE":       "",
-        "INTL_PHONE":  "",
+        "PERSON":      "[PERSON XYZ]",
+        "EMAIL":       "person@domain.com",
+        "PHONE":       "[PHONE NUM]",
+        "INTL_PHONE":  "[PHONE NUM]",
         "SSN":         "",
         "CREDIT_CARD": "",
         "ACCT_NUMBER": "",
-        "ADDRESS":     "",
-        "GPE":         "",
-        "ORG":         ""
+        "ADDRESS":     "[ADDRESS LINE]",
+        "GPE":         "[LOCATION]",
+        "ORG":         "[COMPANY XYZ]"
     },
     "spacy_blocklist": [
         "mm", "dd", "yyyy", "Page", "Statement Date", "Period Covered",
@@ -54,8 +54,50 @@ DEFAULT_CONFIG = {
         "INTL_PHONE":  r"\+\d{1,3}[\s-]?(?:\d[\s-]?){6,14}\b",
         "SSN":         r"\b\d{3}[-]?\d{2}[-]?\d{4}\b",
         "CREDIT_CARD": r"\b(?:\d{4}[-\s]?){3}\d{4}\b",
+        "ADDRESS":     r"\d{2,5}\s[A-Z][a-zA-Z\s,]+(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Ct|Court|STE|Suite|Hwy|Pkwy)[^\n]*?\d{5}",
+
+        # These guys get default masking for now..
+        # Account Number variants (captures digits and hyphens only) 
         "ACCT_NUMBER": r"Account Number:\s*([\d\-]+)",
-        "ADDRESS":     r"\d{2,5}\s[A-Z][a-zA-Z\s,]+(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Ct|Court|STE|Suite|Hwy|Pkwy)[^\n]*?\d{5}"
+
+        "ACCOUNT_NO_COLON": r"Account No:\s*([\d\-]+)",
+        "ACCOUNT_NO_DOT_COLON": r"Account No\.\s*:\s*([\d\-]+)",
+        "ACCOUNT_NUM_COLON": r"Account Num:\s*([\d\-]+)",
+        "ACCOUNT_HASH": r"Account\s*#\s*([\d\-]+)",
+
+        "ACCT_NUMBER_COLON": r"Acct Number:\s*([\d\-]+)",
+        "ACCT_NO_COLON": r"Acct No:\s*([\d\-]+)",
+        "ACCT_NO_DOT_COLON": r"Acct No\.\s*:\s*([\d\-]+)",
+        "ACCT_HASH": r"Acct\s*#\s*([\d\-]+)",
+
+        "A_C_NUMBER_COLON": r"A/C Number:\s*([\d\-]+)",
+        "A_C_NO_COLON": r"A/C No:\s*([\d\-]+)",
+        "A_C_HASH": r"A/C\s*#\s*([\d\-]+)",
+
+        "ACC_NO_COLON": r"Acc No:\s*([\d\-]+)",
+        "ACC_HASH": r"Acc\s*#\s*([\d\-]+)",
+
+        # SWIFT/BIC (8 or 11 chars) 
+        "SWIFT_COLON": r"SWIFT:\s*([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b",
+        "SWIFT_CODE_COLON": r"SWIFT Code:\s*([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b",
+        "BIC_COLON": r"BIC:\s*([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b",
+        "BIC_CODE_COLON": r"BIC Code:\s*([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b",
+        "SWIFT_BIC_COLON": r"SWIFT/BIC:\s*([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b",
+
+
+        # ABA / US Routing Number (exactly 9 digits)
+        "ABA_ROUTING_COLON": r"ABA Routing Number:\s*(\d{9})\b",
+        "ROUTING_NUMBER_COLON": r"Routing Number:\s*(\d{9})\b",
+        "ROUTING_TRANSIT_NUMBER_COLON": r"Routing Transit Number:\s*(\d{9})\b",
+        "ACH_ROUTING_NUMBER_COLON": r"ACH Routing Number:\s*(\d{9})\b",
+        "RTN_COLON": r"RTN:\s*(\d{9})\b",
+        "ABA_COLON": r"ABA:\s*(\d{9})\b",
+
+
+        # IBAN (allows spaces; total length 15–34 excluding spaces) 
+        "IBAN_COLON": r"IBAN:\s*([A-Z]{2}\d{2}(?:\s?[A-Z0-9]){11,30})\b",
+        "IBAN_NUMBER_COLON": r"IBAN Number:\s*([A-Z]{2}\d{2}(?:\s?[A-Z0-9]){11,30})\b",
+        "IBAN_NO_COLON": r"IBAN No:\s*([A-Z]{2}\d{2}(?:\s?[A-Z0-9]){11,30})\b",
     }
 }
 
@@ -176,7 +218,7 @@ def resolve_mask(original: str, cat: str, cfg: dict) -> str:
 # Processing functions
 # ---------------------------------------------------------------------------
 
-# Merges lin
+# Merges lines
 def merge_lines(lines: list, nlp) -> list:
     merged = []
     i = 0
@@ -242,9 +284,10 @@ def detect_pii(text_arr: list, cfg: dict, nlp) -> tuple[dict, dict]:
     """Returns dicts for pii_masked and pii_cat keyed by original info."""
 
     # We're loading the configs here
-    patterns    = cfg["patterns"]               # Regex patterns
-    blocklist   = set(cfg["spacy_blocklist"])   # Spacy blocklist for false flags
-    spacy_ents  = cfg["spacy_entities"]         # Spacy entities we want to redact ("PERSON, GPE, ORG")
+    patterns            = cfg["patterns"]               # Regex patterns
+    blocklist           = set(cfg["spacy_blocklist"])   # Spacy blocklist for false flags
+    spacy_ents          = cfg["spacy_entities"]         # Spacy entities we want to redact ("PERSON, GPE, ORG")
+    non_colon_entities  = ['EMAIL', 'INTL_PHONE', 'PHONE', 'SSN','CREDIT_CARD','ADDRESS']
 
     pii_masked      = {} # dict for original:masked
     pii_cats        = {} # dict for original:category
@@ -254,7 +297,7 @@ def detect_pii(text_arr: list, cfg: dict, nlp) -> tuple[dict, dict]:
         # === REGEX SEARCH === #
         for cat, pattern in patterns.items():
             for match in re.finditer(pattern, line):
-                original = match.group(1) if cat == "ACCT_NUMBER" else match.group(0)
+                original = match.group(0) if cat in non_colon_entities else match.group(1)
                 if original not in pii_masked:
                     pii_masked[original] = resolve_mask(original, cat, cfg)
                     pii_cats[original]   = cat

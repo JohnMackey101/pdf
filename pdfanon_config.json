@@ -17,7 +17,7 @@
     "ACCT_NUMBER": "",
     "ADDRESS": "",
     "GPE": "",
-    "ORG": ""
+    "ORG": "COMPANY XYZ"
   },
   "spacy_blocklist": [
     "mm",
@@ -46,6 +46,12 @@
     "SSN": "\\b\\d{3}[-]?\\d{2}[-]?\\d{4}\\b",
     "CREDIT_CARD": "\\b(?:\\d{4}[-\\s]?){3}\\d{4}\\b",
     "ACCT_NUMBER": "Account Number:\\s*([\\d\\-]+)",
+    "SWIFT": "(?i)(?:SWIFT\\s*/\\s*BIC|SWIFT(?:\\s*Code)?|BIC(?:\\s*Code)?)\\s*:?\\s*([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\\b",
+    "ABA": "(?i)(?:(?:ABA|ACH)\\s*Routing\\s*Number|Routing\\s*(?:Transit\\s*)?Number|RTN|ABA)\\s*:?\\s*([0-9]{9})\\b",
+    "IBAN": "(?i)IBAN(?:\\s*(?:No\\.?|Number))?\\s*:?\\s*([A-Z]{2}\\d{2}(?:\\s?[A-Z0-9]){11,30})\\b",
+    "FAX_NUMBER_HASH": "Fax Number\\s*#\\s*([\\+\\d\\(\\)\\s\\-]{6,})",
+    "FAX_NUMBER_COLON": "Fax Number:\\s*([\\+\\d\\(\\)\\s\\-]{6,})",
+    "FAX_COLON": "Fax:\\s*([\\+\\d\\(\\)\\s\\-]{6,}",
     "ADDRESS": "\\d{2,5}\\s[A-Z][a-zA-Z\\s,]+(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Ct|Court|STE|Suite|Hwy|Pkwy)[^\\n]*?\\d{5}"
   }
 }
