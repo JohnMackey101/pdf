@@ -205,10 +205,14 @@ def merge_lines(lines: list, nlp) -> list:
                 # Location matches the following patterns
                 # 1. Santa Monica, CA 90403 (Place, 2 letter state, 6 zipcode)
                 # 2. Barclays Bank, London (Place, Another place)
-                # 3. United Kingdom/England/Ireland/etc..
+                # 3. Springfield 62704 (Place+5digit zipcode)
+                # 4. United Kingdom/England/Ireland/etc..
 
                 next_is_location = bool(re.search(
-                    r"([A-Z][a-zA-Z\s]+,\s*[A-Z]{2}\s*\d{4,6}|[A-Z][a-zA-Z\s]+,\s*[A-Z][a-zA-Z\s]+|United\sKingdom|England|Scotland|Wales)",
+                    r"([A-Z][a-zA-Z\s]+,\s*[A-Z]{2}\s*\d{4,6}"
+                    r"|[A-Z][a-zA-Z\s]+,\s*[A-Z][a-zA-Z\s]+"
+                    r"|[A-Z][a-zA-Z]+\s+[A-Z]{2}\s+\d{5}"  
+                    r"|United\sKingdom|England|Scotland|Wales)",
                     next_line
                 ))
                 if next_is_gpe or next_is_location:
@@ -229,6 +233,9 @@ def process_doc(path: str, nlp) -> list:
     
     # Split text by '\n' and remove any whitespace lines 
     lines = [t for t in doc.split("\n") if t.strip()]
+
+    # remove any weird asterick formatting
+    lines = [re.sub(r'\*+', '', line).strip() for line in lines]
     return merge_lines(lines, nlp) # merge lines once we're donezo
 
 def detect_pii(text_arr: list, cfg: dict, nlp) -> tuple[dict, dict]:
@@ -282,6 +289,7 @@ def detect_pii(text_arr: list, cfg: dict, nlp) -> tuple[dict, dict]:
                 pii_masked[original_text]   = resolve_mask(clean, ent.label_, cfg)
                 pii_cats[original_text]     = ent.label_
 
+    #print(pii_masked) # to debug
     return pii_masked, pii_cats
 
 
