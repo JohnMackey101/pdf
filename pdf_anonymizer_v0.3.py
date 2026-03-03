@@ -29,7 +29,7 @@ import spacy
 DEFAULT_CONFIG = {
     "output_suffix": "_anonymized",
     "spacy_model": "en_core_web_sm",
-    "spacy_entities": ["PERSON", "GPE", "ORG"],
+    "spacy_entities": ["PERSON", "GPE", "ORG", "LAW"],
     "mask_style": {
         "PERSON":      "[PERSON XYZ]",
         "EMAIL":       "person@domain.com",
@@ -55,7 +55,7 @@ DEFAULT_CONFIG = {
         "SSN":         r"\b\d{3}[-]?\d{2}[-]?\d{4}\b",
         "CREDIT_CARD": r"\b(?:\d{4}[-\s]?){3}\d{4}\b",
         "ADDRESS":     r"\d{2,5}\s[A-Z][a-zA-Z\s,]+(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Ct|Court|STE|Suite|Hwy|Pkwy)[^\n]*?\d{5}",
-
+        "COMPANY_NAMES": r"(?i)\b(Affinity\s+Water)\b",
         # These guys get default masking for now..
         # Account Number variants (captures digits and hyphens only) 
         "ACCT_NUMBER": r"Account Number:\s*([\d\-]+)",
@@ -206,6 +206,10 @@ def resolve_mask(original: str, cat: str, cfg: dict) -> str:
     defaults to mask_default.
     """
     label = cfg.get("mask_style", {}).get(cat, "")
+
+    # If user-specified label exists use that one. 
+    # Should probably make this a list of generic names that matches
+    # the len of the str...
     if label:
         return label
     #fn = MASK_FN.get(cat)
