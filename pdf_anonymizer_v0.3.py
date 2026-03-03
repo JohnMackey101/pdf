@@ -303,13 +303,21 @@ def detect_pii(text_arr: list, cfg: dict, nlp) -> tuple[dict, dict]:
 
     # We're loading the configs here
     patterns            = cfg["patterns"]               # Regex patterns
-    blocklist           = set(cfg["spacy_blocklist"])   # Spacy blocklist for false flags
+    blocklist           = cfg["spacy_blocklist"]        # Spacy blocklist for false flags
+    blocklist_lower     = set(item.lower() for item in blocklist)  # Case-insensitive blocklist
     spacy_ents          = cfg["spacy_entities"]         # Spacy entities we want to redact ("PERSON, GPE, ORG")
     non_colon_entities  = ['EMAIL', 'INTL_PHONE', 'PHONE', 'SSN','CREDIT_CARD','ADDRESS']
 
     pii_masked      = {} # dict for original:masked
     pii_cats        = {} # dict for original:category
     address_matches = [] # dict for seen addresses 
+
+    def is_blocklisted(text: str) -> bool:
+        """Check if text matches any blocklist item (case-insensitive, exact match only)."""
+        text_lower = text.lower().strip()
+        # Exact match only (case-insensitive)
+        return text_lower in blocklist_lower
+
 
     for line in text_arr:
         # === REGEX SEARCH === #
@@ -336,8 +344,12 @@ def detect_pii(text_arr: list, cfg: dict, nlp) -> tuple[dict, dict]:
                 clean = re.split(r"\d", clean)[0].strip()
                 original_text = original_text[: len(clean)]
             
-            # check if clean is in our blocklist
-            if not clean or clean in blocklist:
+            # Skip empty text
+            if not clean:
+                continue
+
+            # Check blocklist (case-insensitive with partial matching)
+            if is_blocklisted(clean):
                 continue
 
             # check if clean is in any of the addresses 
@@ -398,55 +410,94 @@ def redact_pdf(input_path: str, output_path: str, findings: dict) -> None:
     doc = pymupdf.open(input_path)
 
     for page in doc:
-        # Build a font-size map so it matches page sizes 
-        size_map = {}
-        for block in page.get_text("dict")["blocks"]:
-            if "lines" in block:
-                for line in block["lines"]:
-                    for span in line["spans"]:
-                        # maps stripped TEXT to the SIZE 
-                        size_map[span["text"].strip()] = span["size"]
-
-        # We quickly sort the findings by longest so 
-        # we avoid partial-overlap problems
-        # Ex. "London", then "Barclays London" would flag london twice if london was
-        # written first.
+        # Sort findings by length (longest first) to avoid partial-overlap problems
         sorted_findings = dict(
             sorted(findings.items(), key=lambda x: len(x[0]), reverse=True)
         )
 
-        redacted_rects = [] # Already redacted rectangles
-        rects_to_draw  = {} # Rectangle coords we're meant to draw for each mask
-
+        # Build a map of spans that contain text we need to redact
+        # We'll redact entire spans and replace the text within them
+        spans_to_redact = {}  # span_bbox -> span_info
+        matched_originals = set()  # Track which findings have been matched
+        
+        blocks = page.get_text("dict")["blocks"]
         for original, masked in sorted_findings.items():
-            hits = page.search_for(original)
-            new_hits = []
-            for rect in hits:
-                if any(rect.intersects(r) for r in redacted_rects):
+            for block in blocks:
+                if "lines" not in block:
                     continue
-                new_hits.append(rect)
-                redacted_rects.append(rect)
-            if new_hits:
-                rects_to_draw[original] = new_hits
-                for rect in new_hits:
-                    page.add_redact_annot(rect, fill=(1, 1, 1))
+                for line in block["lines"]:
+                    for span in line["spans"]:
+                        span_text = span["text"]
+                        # Check if original is in span text (exact substring match)
+                        if original in span_text:
+                            bbox_key = tuple(span["bbox"])
+                            if bbox_key not in spans_to_redact:
+                                spans_to_redact[bbox_key] = {
+                                    "text": span_text,
+                                    "size": span["size"],
+                                    "bbox": span["bbox"],
+                                    "replacements": {}
+                                }
+                            # Add this replacement to the span
+                            spans_to_redact[bbox_key]["replacements"][original] = masked
+                            matched_originals.add(original)
+                        # Also check if span text is contained in original (for multi-span entities)
+                        # e.g., original="KBC Group NV Avenue du Port", span="KBC Group NV"
+                        # Only match if span starts at the beginning of original (to avoid matching address parts)
+                        elif span_text.strip() and original.startswith(span_text.strip()) and len(span_text.strip()) > 3:
+                            bbox_key = tuple(span["bbox"])
+                            if bbox_key not in spans_to_redact:
+                                spans_to_redact[bbox_key] = {
+                                    "text": span_text,
+                                    "size": span["size"],
+                                    "bbox": span["bbox"],
+                                    "replacements": {}
+                                }
+                            # For partial matches, replace the entire span with masked version
+                            spans_to_redact[bbox_key]["replacements"][span_text] = masked
+                            matched_originals.add(original)
 
-        # actually apply rects, ignore images 
+        # First pass: add redaction annotations (white boxes)
+        text_insertions = []  # Store info for text insertion after redaction
+        redacted_bboxes = set()
+        
+        for bbox_key, span_info in spans_to_redact.items():
+            if bbox_key in redacted_bboxes:
+                continue
+            
+            rect = pymupdf.Rect(bbox_key)
+            new_text = span_info["text"]
+            
+            # Apply all replacements to this span's text
+            for original, masked in span_info["replacements"].items():
+                new_text = new_text.replace(original, masked)
+            
+            # Store for later text insertion
+            text_insertions.append({
+                "rect": pymupdf.Rect(rect),  # Copy the rect
+                "text": new_text,
+                "size": span_info["size"]
+            })
+            
+            # Add redaction annotation (just white fill, no text)
+            page.add_redact_annot(rect, fill=(1, 1, 1))
+            redacted_bboxes.add(bbox_key)
+
+        # Apply all redactions at once
         page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_NONE)
-
-        # write stuff over the white masks...
-        for original, rects in rects_to_draw.items():
-            masked    = findings[original]
-            # default fontsize 10 if we cant find the sizemap
-            fontsize  = size_map.get(original.strip(), 10)
-            for rect in rects:
-                page.insert_text(
-                    (rect.x0, rect.y1 - 2),
-                    masked,
-                    fontname="helv",
-                    fontsize=fontsize,
-                    color=(0, 0, 0),
-                )
+        
+        # Second pass: insert text at the original positions
+        for item in text_insertions:
+            rect = item["rect"]
+            # Position text at the baseline (approximately 80% down from top of rect)
+            baseline_y = rect.y0 + (rect.height * 0.8)
+            page.insert_text(
+                (rect.x0, baseline_y),
+                item["text"],
+                fontname="helv",
+                fontsize=item["size"],
+                color=(0, 0, 0),
+            )
 
     doc.save(output_path, garbage=4, deflate=True)
     doc.close()
