@@ -16,6 +16,7 @@ import os
 import re
 import sys
 
+from annotated_types import doc
 import pymupdf
 import pymupdf4llm
 import spacy
@@ -23,13 +24,15 @@ import spacy
 # ---------------------------------------------------------------------------
 # Default config (we make a default with on disk if there's nothing)
 # Set any category to a fixed label like '[NAME]' or '[REDACTED]'. 
+# Supports comma-separated lists for cases where you want to specify different labels 
+# for different lengths for robustness ex. you can have name masked to "Joe,Jane,Smith,..."
 # Leave out to use the default star masking.
 # ---------------------------------------------------------------------------
 
 DEFAULT_CONFIG = {
     "output_suffix": "_anonymized",
     "spacy_model": "en_core_web_sm",
-    "spacy_entities": ["PERSON", "GPE", "ORG", "LAW"],
+    "spacy_entities": ["PERSON", "GPE", "ORG"],
     "mask_style": {
         "PERSON":      "[PERSON XYZ]",
         "EMAIL":       "person@domain.com",
@@ -192,7 +195,7 @@ MASK_FN = {
     "INTL_PHONE":  mask_phone,
     "CREDIT_CARD": mask_credit_card,
     "ADDRESS":     mask_address,
-    "GPE":         lambda x: x[0] + "*" * (len(x) - 2) + x[-1],
+    "GPE":         lambda x: "**" if len(x) == 2 else x[0] + "*" * (len(x) - 2) + x[-1],
     "ORG":         lambda x: x[0] + "*" * (len(x) - 2) + x[-1],
 }
 
@@ -201,6 +204,7 @@ def resolve_mask(original: str, cat: str, cfg: dict) -> str:
     Returns the masked string for a given original + category.
     If the config has a non-empty label for that category (e.g. '[NAME]'),
     that label is used as-is. Otherwise falls back to the default star-masking function.
+    If mask is comma-separated it resolves it as a list and matches the length
 
     In the case where a new pattern has been added but there is no masking func it
     defaults to mask_default.
@@ -211,7 +215,17 @@ def resolve_mask(original: str, cat: str, cfg: dict) -> str:
     # Should probably make this a list of generic names that matches
     # the len of the str...
     if label:
-        return label
+        # Resolve arr from commas (if any)
+        label_list = label.split(",")
+        if len(label_list) == 1:
+            return label
+        else:
+            for l in label_list:
+                if len(l) == len(original):
+                    return l
+            return label_list[-1]
+
+                
     #fn = MASK_FN.get(cat)
     #return fn(original) if fn else original
     fn = MASK_FN.get(cat, mask_default)
@@ -313,11 +327,8 @@ def detect_pii(text_arr: list, cfg: dict, nlp) -> tuple[dict, dict]:
     address_matches = [] # dict for seen addresses 
 
     def is_blocklisted(text: str) -> bool:
-        """Check if text matches any blocklist item (case-insensitive, exact match only)."""
-        text_lower = text.lower().strip()
-        # Exact match only (case-insensitive)
-        return text_lower in blocklist_lower
-
+        """Check if text is a blocklisted term (case-insensitive, exact match)."""
+        return any(item.lower().strip() in blocklist_lower for item in text.split())
 
     for line in text_arr:
         # === REGEX SEARCH === #
@@ -331,25 +342,33 @@ def detect_pii(text_arr: list, cfg: dict, nlp) -> tuple[dict, dict]:
                         address_matches.append(original)
 
         # === NAMED-ENTITY-RECOGNITION (NER) WITH spaCy === #
-        doc = nlp(line.title()) # titling to pick up flags like 'Jon smith'
-        for ent in doc.ents:
+        # If i do title it catches 'Jon smith' 'HSBC bank', but also catches a lot of false flags
+        # If i dont do title it misses them, but also has no false flags..
+        doc = nlp(line.title())
+        doc_titled = nlp(line.title())
+        all_ents = list(doc.ents) + [e for e in doc_titled.ents if e.label_ == "PERSON"]
+        #print(line)
+        #for ent in list(doc.ents):
+        for ent in all_ents:
+            print(ent.text, ent.label_)
             if ent.label_ not in spacy_ents:
                 continue
-            # save original_text since it'll have diff casing from what spacy sees
+
+            # doc_titled offsets map to line.title(), not line - recover from original
             original_text = line[ent.start_char:ent.end_char].strip()
             clean = ent.text.strip()
 
             # check if spacy accidentally caught any numbers like 'jon smith 23323' or something..
             if any(c.isdigit() for c in clean):
                 clean = re.split(r"\d", clean)[0].strip()
-                original_text = original_text[: len(clean)]
+                original_text = original_text[:len(clean)]
             
-            # Skip empty text
-            if not clean:
+            if not clean:  
                 continue
 
-            # Check blocklist (case-insensitive with partial matching)
+            # Check blocklist (case-insensitive, exact match)
             if is_blocklisted(clean):
+                print(f"  [blocklisted] Skipping entity: {clean!r} (line: {line!r})")
                 continue
 
             # check if clean is in any of the addresses 
