@@ -4,23 +4,28 @@
   "spacy_entities": [
     "PERSON",
     "GPE",
-    "ORG",
-    "LAW"
+    "ORG"
   ],
   "mask_style": {
     "__comment__": "Set any category to a fixed label like '[NAME]' or '[REDACTED]'. Leave out to use the default star masking.",
-    "PERSON": "",
+    "PERSON": "Joe,Jone,Smith,William,[PERSON]",
     "EMAIL": "[EMAIL]",
-    "PHONE": "",
-    "INTL_PHONE": "",
-    "SSN": "",
-    "CREDIT_CARD": "",
-    "ACCT_NUMBER": "",
-    "ADDRESS": "",
-    "GPE": "",
-    "ORG": "COMPANY X",
-    "LAW": "COMPANY X",
-    "COMPANY_NAMES": "COMPANY X" 
+    "PHONE": "[PHONE]",
+    "INTL_PHONE": "[INTL_PHONE]",
+    "SSN": "[SSN]",
+    "CREDIT_CARD": "[CREDIT_CARD]",
+    "ACCT_NUMBER": "[ACCT_NUM]",
+    "ADDRESS": "[ADDRESS]",
+    "GPE": "[GPE]",
+    "ORG": "[COMPANY X]",
+    "COMPANY_NAMES": "[COMPANY X]",
+    "ACCT_NUMBER_LABELED": "[ACCT_NUM]",
+    "ACCT_NUMBER_AC": "[ACCT_NUM]",
+    "SWIFT_LABELED": "[SWIFT/BIC]",
+    "ABA_LABELED": "[ROUTING/ABA]",
+    "IBAN_LABELED": "[IBAN]",
+    "SORT_CODE_LABELED": "[SORT CODE]",
+    "BSB_LABELED": "[BSB]"
   },
   "spacy_blocklist": [
     "mm",
@@ -69,7 +74,6 @@
     "Payment Date",
     "Value Date",
     "Number",
-    "Account",
     "IBAN",
     "SWIFT",
     "BIC",
@@ -78,10 +82,8 @@
     "Drawdown",
     "Facility",
     "Arranger",
-    "Borrower",
     "Obligor",
     "Guarantor",
-    "Lender",
     "Office",
     "Transfer",
     "Order",
@@ -113,7 +115,7 @@
     "Consolidate",
     "Disburse",
     "Institutions",
-    "Place",
+    "Attn",
     "Confirmations",
     "Representations",
     "Warranties",
@@ -131,25 +133,35 @@
     "Onward",
     "Pro Rata",
     "Lenders",
-    "Lender",
     "Schedule",
-    "Rata",
-    "Receiving"
+    "Rata"
   ],
-  "patterns": {
+"patterns": {
     "EMAIL": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b",
-    "PHONE": "(?:(?:\\+44|0)[\\s-]?(?:\\d[\\s-]?){9,10})\\b",
-    "INTL_PHONE": "\\+\\d{1,3}[\\s-]?(?:\\d[\\s-]?){6,14}\\b",
-    "SSN": "\\b\\d{3}[-]?\\d{2}[-]?\\d{4}\\b",
-    "CREDIT_CARD": "\\b(?:\\d{4}[-\\s]?){3}\\d{4}\\b",
-    "ACCT_NUMBER": "Account Number:\\s*([\\d\\-]+)",
-    "SWIFT": "(?i)(?:SWIFT\\s*/\\s*BIC|SWIFT(?:\\s*Code)?|BIC(?:\\s*Code)?)\\s*:?\\s*([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\\b",
-    "ABA": "(?i)(?:(?:ABA|ACH)\\s*Routing\\s*Number|Routing\\s*(?:Transit\\s*)?Number|RTN|ABA)\\s*:?\\s*([0-9]{9})\\b",
-    "IBAN": "(?i)IBAN(?:\\s*(?:No\\.?|Number))?\\s*:?\\s*([A-Z]{2}\\d{2}(?:\\s?[A-Z0-9]){11,30})\\b",
+    "PHONE": "(?i)(?:(?:Tel(?:ephone)?|Mobile|Cell|Ph(?:one)?|Contact|Direct|DDI|DID)\\s*(?:No\\.?|#|Number)?\\s*:?\\s*)?(?:\\+(?:1[\\s-]?(?:\\(?[2-9][0-9]{2}\\)?[\\s.-]?[2-9][0-9]{2}[\\s.-]?[0-9]{4})|44[\\s-]?(?:\\d[\\s-]?){9,10}|49[\\s-]?(?:\\d[\\s-]?){10,14}|33[\\s-]?[1-9](?:[\\s.-]?\\d{2}){4}|34[\\s-]?[6-9]\\d{8}|39[\\s-]?0?\\d{6,12}|61[\\s-]?[2-578](?:[\\s-]?\\d){8}|91[\\s-]?[6-9]\\d{9}|\\d{1,3}[\\s-]?(?:\\d[\\s-]?){6,14})|(?:0[\\s-]?(?:\\d[\\s-]?){9,10})|(?:[2-9][0-9]{2}[\\s.-]?[2-9][0-9]{2}[\\s.-]?[0-9]{4})|(?:[6-9]\\d{9}))\\b",
+
+    "ACCT_NUMBER_LABELED": "(?i)(?:Account\\s*(?:No\\.?|Number|#)|Acct\\.?\\s*(?:No\\.?|#)?)\\s*:?\\s*([\\d][\\d\\-\\s]{5,20}[\\d])",
+    "ACCT_NUMBER_AC": "(?i)\\bA/?C\\s*(?:No\\.?|#)?\\s*:?\\s*([\\d][\\d\\-\\s]{5,20}[\\d])",
+
+    "SWIFT_LABELED": "(?i)(?:SWIFT\\s*/\\s*BIC|SWIFT(?:\\s*Code)?|BIC(?:\\s*Code)?)\\s*:?\\s*([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)",
+    "ABA_LABELED": "(?i)(?:(?:ABA|ACH)\\s*Routing\\s*(?:Transit\\s*)?Number|Routing\\s*(?:Transit\\s*)?(?:Number|No\\.?|#)|RTN|ABA)\\s*:?\\s*([0-9]{9})\\b",
+    "IBAN_LABELED": "(?i)IBAN(?:\\s*(?:No\\.?|Number|#))?\\s*:?\\s*([A-Z]{2}\\d{2}(?:\\s?[A-Z0-9]){11,30})\\b",
+
+    "SORT_CODE_LABELED": "(?i)(?:Sort\\s*Code|SC)\\s*:?\\s*(\\d{2}[-\\s]?\\d{2}[-\\s]?\\d{2})\\b",
+
+    "UK_BANK_ACCOUNT": "(?i)(?:Account\\s*(?:No\\.?|Number|#))\\s*:?\\s*([0-9]{8})\\b",
+
+    "BSB_LABELED": "(?i)BSB\\s*(?:No\\.?|Number|#)?\\s*:?\\s*(\\d{3}[-\\s]?\\d{3})\\b",
+
+    "CLABE": "(?i)CLABE\\s*:?\\s*(\\d{18})\\b",
+    "IFSC": "(?i)IFSC\\s*(?:Code)?\\s*:?\\s*([A-Z]{4}0[A-Z0-9]{6})\\b",
+    "MICR": "(?i)(?:MICR|Cheque\\s*No\\.?)\\s*:?\\s*([0-9]{9}[\\s\\|:]*[0-9]{6,17})\\b",
+    "WIRE_REFERENCE": "(?i)(?:Wire\\s*(?:Transfer\\s*)?(?:Ref(?:erence)?|#|No\\.?)|Remittance\\s*(?:Ref(?:erence)?|ID))\\s*:?\\s*([A-Z0-9\\-]{6,30})\\b",
+
     "FAX_NUMBER_HASH": "Fax Number\\s*#\\s*([\\+\\d\\(\\)\\s\\-]{6,})",
     "FAX_NUMBER_COLON": "Fax Number:\\s*([\\+\\d\\(\\)\\s\\-]{6,})",
     "FAX_COLON": "Fax:\\s*([\\+\\d\\(\\)\\s\\-]{6,})",
     "ADDRESS": "\\d{2,5}\\s[A-Z][a-zA-Z\\s,]+(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Ct|Court|STE|Suite|Hwy|Pkwy)[^\\n]*?\\d{5}",
-    "COMPANY_NAMES": "(?i)\\b(Affinity\\s+Water|Citibank)\\b"
+    "COMPANY_NAMES": "(?i)\\b(?:Affinity\\s+Water|Citibank|JPMorgan\\s+Chase)\\b"
   }
 }

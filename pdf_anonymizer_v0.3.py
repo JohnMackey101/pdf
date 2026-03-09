@@ -37,7 +37,6 @@ DEFAULT_CONFIG = {
         "PERSON":      "[PERSON XYZ]",
         "EMAIL":       "person@domain.com",
         "PHONE":       "[PHONE NUM]",
-        "INTL_PHONE":  "[PHONE NUM]",
         "SSN":         "",
         "CREDIT_CARD": "",
         "ACCT_NUMBER": "",
@@ -320,11 +319,14 @@ def detect_pii(text_arr: list, cfg: dict, nlp) -> tuple[dict, dict]:
     blocklist           = cfg["spacy_blocklist"]        # Spacy blocklist for false flags
     blocklist_lower     = set(item.lower() for item in blocklist)  # Case-insensitive blocklist
     spacy_ents          = cfg["spacy_entities"]         # Spacy entities we want to redact ("PERSON, GPE, ORG")
-    non_colon_entities  = ['EMAIL', 'INTL_PHONE', 'PHONE', 'SSN','CREDIT_CARD','ADDRESS']
+    non_colon_entities = ["EMAIL", "PHONE", "CREDIT_CARD", "SWIFT_INLINE", "ABA_INLINE", "IBAN_INLINE",
+                          "SORT_CODE_INLINE", "BSB_INLINE", "ADDRESS", "COMPANY_NAMES"]
 
     pii_masked      = {} # dict for original:masked
     pii_cats        = {} # dict for original:category
     address_matches = [] # dict for seen addresses 
+
+    regex_matches = set() # to track regex matches and prevent double-masking with spacy
 
     def is_blocklisted(text: str) -> bool:
         """Check if text is a blocklisted term (case-insensitive, exact match)."""
@@ -334,23 +336,25 @@ def detect_pii(text_arr: list, cfg: dict, nlp) -> tuple[dict, dict]:
         # === REGEX SEARCH === #
         for cat, pattern in patterns.items():
             for match in re.finditer(pattern, line):
+                print("match found  for category", pattern)
                 original = match.group(0) if cat in non_colon_entities else match.group(1)
                 if original not in pii_masked:
                     pii_masked[original] = resolve_mask(original, cat, cfg)
                     pii_cats[original]   = cat
                     if cat == "ADDRESS":
                         address_matches.append(original)
+                    regex_matches.add(original)
 
         # === NAMED-ENTITY-RECOGNITION (NER) WITH spaCy === #
         # If i do title it catches 'Jon smith' 'HSBC bank', but also catches a lot of false flags
         # If i dont do title it misses them, but also has no false flags..
-        doc = nlp(line.title())
+        print("Line", line)
+        doc = nlp(line)
         doc_titled = nlp(line.title())
         all_ents = list(doc.ents) + [e for e in doc_titled.ents if e.label_ == "PERSON"]
         #print(line)
         #for ent in list(doc.ents):
         for ent in all_ents:
-            print(ent.text, ent.label_)
             if ent.label_ not in spacy_ents:
                 continue
 
@@ -360,6 +364,7 @@ def detect_pii(text_arr: list, cfg: dict, nlp) -> tuple[dict, dict]:
 
             # check if spacy accidentally caught any numbers like 'jon smith 23323' or something..
             if any(c.isdigit() for c in clean):
+                print("Digit found")
                 clean = re.split(r"\d", clean)[0].strip()
                 original_text = original_text[:len(clean)]
             
@@ -371,9 +376,10 @@ def detect_pii(text_arr: list, cfg: dict, nlp) -> tuple[dict, dict]:
                 print(f"  [blocklisted] Skipping entity: {clean!r} (line: {line!r})")
                 continue
 
-            # check if clean is in any of the addresses 
-            # COULD be problematic for situations like 'Monica' and 'Santa Monica'...
-            if any(clean in addr for addr in address_matches):
+            # check if spacy caught something we've already caught with regex - if so skip to avoid double masking
+            for key in regex_matches:
+                if clean in key:
+                    print("  [regex match exists] Skipping entity: {clean!r} (line: {line!r})")
                 continue
 
             # apply masking after all checks are done
